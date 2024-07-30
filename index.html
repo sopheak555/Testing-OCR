@@ -3,41 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt Scanner</title>
+    <title>Receipt Scanner (Debug)</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
-        }
-        button {
-            background-color: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            border: none;
-            padding: 10px 20px;
-            margin: 10px 0;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        #result {
+        /* ... (previous styles) ... */
+        #debug {
             margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
             white-space: pre-wrap;
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
-    <h1>Receipt Scanner</h1>
+    <h1>Receipt Scanner (Debug)</h1>
     <button id="scanButton">Scan Receipt</button>
     <div id="result"></div>
+    <div id="debug"></div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
 
+        function log(message) {
+            console.log(message);
+            document.getElementById('debug').textContent += message + '\n';
+        }
+
         document.getElementById('scanButton').addEventListener('click', () => {
+            log('Scan button clicked');
             tg.showPopup({
                 title: 'Select Image',
                 message: 'Choose an image to scan',
@@ -46,6 +41,7 @@
                     {id: 'gallery', type: 'default', text: 'Choose from Gallery'}
                 ]
             }, (buttonId) => {
+                log(`Button clicked: ${buttonId}`);
                 if (buttonId === 'camera' || buttonId === 'gallery') {
                     selectImage(buttonId === 'camera');
                 }
@@ -53,6 +49,7 @@
         });
 
         function selectImage(useCamera) {
+            log(`Selecting image, useCamera: ${useCamera}`);
             tg.showPopup({
                 title: 'Processing',
                 message: 'Please wait while we process your image...',
@@ -64,8 +61,10 @@
             const mediaOptions = useCamera ? { type: 'photo', removeAfterSend: true } : { types: ['photo'], removeAfterSend: true };
             tg.openMedia(mediaOptions, (media) => {
                 if (media && media.length > 0) {
+                    log('Media selected, uploading...');
                     uploadImage(media[0]);
                 } else {
+                    log('No media selected');
                     tg.closePopup();
                     tg.showAlert('No image selected.');
                 }
@@ -73,26 +72,32 @@
         }
 
         function uploadImage(file) {
-            console.log("Uploading file:", file);
+            log(`Uploading file: ${file.name}, size: ${file.size} bytes`);
             const formData = new FormData();
             formData.append('image', file);
             formData.append('chat_id', tg.initDataUnsafe.user.id);
+
             fetch('https://127.0.0.1:5000/scan_receipt', {
                 method: 'POST',
                 body: formData
             })
             .then(response => {
+                log(`Server response status: ${response.status}`);
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    return response.text().then(text => {
+                        throw new Error(`Network response was not ok: ${response.status} ${response.statusText}\n${text}`);
+                    });
                 }
                 return response.json();
             })
             .then(data => {
+                log('Data received from server');
                 tg.closePopup();
                 document.getElementById('result').textContent = JSON.stringify(data, null, 2);
-                tg.showAlert('Receipt data has been sent to your Telegram chat.');
+                tg.showAlert('Receipt data has been processed.');
             })
             .catch(error => {
+                log(`Error: ${error.message}`);
                 tg.closePopup();
                 tg.showAlert('Error processing image: ' + error.message);
             });
