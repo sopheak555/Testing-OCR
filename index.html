@@ -75,8 +75,9 @@
         function uploadImage(file) {
             const formData = new FormData();
             formData.append('image', file);
+            formData.append('chat_id', tg.initDataUnsafe.user.id);
 
-            fetch('https://your-server-url.com/scan_receipt', {
+            fetch('https://127.0.0.1:5000/scan_receipt', {
                 method: 'POST',
                 body: formData
             })
@@ -89,6 +90,7 @@
             .then(data => {
                 tg.closePopup();
                 document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+                tg.showAlert('Receipt data has been sent to your Telegram chat.');
             })
             .catch(error => {
                 tg.closePopup();

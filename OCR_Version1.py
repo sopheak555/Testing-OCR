@@ -4,33 +4,22 @@ import os
 import json
 from datetime import datetime
 import logging
-import pyodbc
 import google.generativeai as genai
 from PIL import Image
 from io import BytesIO
+import requests
 
 app = Flask(__name__)
 CORS(app)
 
 logging.basicConfig(level=logging.INFO)
 
-# Update these connection details with your actual database information
-connection_string = (
-    'DRIVER={ODBC Driver 17 for SQL Server};'
-    'SERVER=your_server_name;'
-    'DATABASE=your_database_name;'
-    'UID=your_username;'
-    'PWD=your_password;'
-)
+# Telegram Bot API settings
+TELEGRAM_BOT_TOKEN = "7496198379:AAEi9VUwukzbbal92rG9xuGXIXdahB4T6Kc"
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
-try:
-    connection = pyodbc.connect(connection_string)
-    cursor = connection.cursor()
-    logging.info("Connection to SQL Server database established successfully.")
-except Exception as e:
-    logging.error(f"Error connecting to SQL Server database: {e}")
-
-gemini_api_key = "your_gemini_api_key"
+# Gemini AI settings
+gemini_api_key = "AIzaSyDeXUlxp9OatBZVTXiPqa3rMC4w1Po3A6w"
 genai.configure(api_key=gemini_api_key)
 model = genai.GenerativeModel(model_name="gemini-1.5-pro")
 
@@ -40,6 +29,10 @@ def scan_receipt():
         return jsonify({"error": "No image file uploaded"}), 400
 
     image_file = request.files['image']
+    chat_id = request.form.get('chat_id')
+    
+    if not chat_id:
+        return jsonify({"error": "No chat_id provided"}), 400
     
     try:
         image_content = image_file.read()
@@ -48,9 +41,11 @@ def scan_receipt():
             return jsonify({"error": "Failed to extract text from the image"}), 500
 
         cleaned_data_dict = process_extracted_text(extracted_text)
-        insert_data_to_database(cleaned_data_dict)
+        
+        # Send the extracted data to Telegram
+        send_message_to_telegram(chat_id, json.dumps(cleaned_data_dict, indent=2))
 
-        return jsonify({"message": "Data extracted and inserted successfully", "data": cleaned_data_dict}), 200
+        return jsonify({"message": "Data extracted and sent to Telegram successfully", "data": cleaned_data_dict}), 200
 
     except Exception as e:
         logging.error(f"Error processing receipt: {e}")
@@ -82,8 +77,6 @@ def process_extracted_text(extracted_text):
 
     cleaned_data_dict = {key.replace(":", "").strip(): (value.strip("$, ") if value is not None else None)
                          for key, value in data_dict.items()}
-    
-    cleaned_data_dict["Driver Name"] = "YourUsername"
 
     if "DATE" in cleaned_data_dict and cleaned_data_dict["DATE"]:
         date_str = cleaned_data_dict["DATE"].replace(": ", "").strip()
@@ -99,22 +92,16 @@ def process_extracted_text(extracted_text):
 
     return cleaned_data_dict
 
-def insert_data_to_database(cleaned_data_dict):
-    transaction_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    plate_no = cleaned_data_dict.get("PLATE NO", "")
-    date = cleaned_data_dict.get("DATE", "1900-01-01")
-    previous_km = float(cleaned_data_dict.get("Previous KM", 0))
-    actual_km = float(cleaned_data_dict.get("Actual KM", 0))
-    qty = float(cleaned_data_dict.get("QTY", 0.0))
-    total = float(cleaned_data_dict.get("TOTAL", 0.0))
-    amount = float(cleaned_data_dict.get("AMOUNT", 0.0))
-    driver_name = cleaned_data_dict.get("Driver Name", "")
-
-    cursor.execute('''INSERT INTO Tbl_TotalEnergies([PLATE_NO], [DATE], [Previous_KM], [Actual_KM], [QTY], [TOTAL], [AMOUNT], [Driver_Name], [transaction_date])
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                  (plate_no, date, previous_km, actual_km, qty, total, amount, driver_name, transaction_date))
-    connection.commit()
+def send_message_to_telegram(chat_id, message):
+    url = f"{TELEGRAM_API_URL}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    response = requests.post(url, json=payload)
+    if response.status_code != 200:
+        logging.error(f"Failed to send message to Telegram: {response.text}")
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
