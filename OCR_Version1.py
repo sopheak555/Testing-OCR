@@ -18,14 +18,11 @@ HTML = """
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
         #result { margin-top: 20px; border: 1px solid #ccc; padding: 10px; min-height: 100px; }
         #loader { display: none; text-align: center; margin-top: 20px; }
-        #camera { width: 100%; max-width: 400px; height: 300px; border: 2px solid #ccc; margin: 20px auto; }
         #scanButton { display: block; margin: 20px auto; padding: 10px 20px; font-size: 16px; }
     </style>
 </head>
 <body>
     <h1>Image Text Extractor</h1>
-    <video id="camera" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
     <button id="scanButton" onclick="captureImage()">Scan Image</button>
     <div id="loader">Processing...</div>
     <div id="result"></div>
@@ -34,23 +31,13 @@ HTML = """
         let tg = window.Telegram.WebApp;
         tg.expand();
 
-        const video = document.getElementById('camera');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-
-        async function setupCamera() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-            video.srcObject = stream;
-        }
-
-        setupCamera();
-
         function captureImage() {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
-            extractText(imageData);
+            tg.showScanQrPopup({text: "Scan an image with text"}, function(result) {
+                if (result) {
+                    // The result contains the scanned image data
+                    extractText(result);
+                }
+            });
         }
 
         async function extractText(imageData) {
@@ -84,11 +71,17 @@ HTML = """
 # Function to get Vision API client
 def get_vision_client():
     try:
-        credentials_path = 'credentials.json'
-        if os.path.exists(credentials_path):
-            credentials = service_account.Credentials.from_service_account_file(credentials_path)
-            return vision.ImageAnnotatorClient(credentials=credentials)
-        return vision.ImageAnnotatorClient()
+        credentials_json = os.environ.get('GOOGLE_CREDENTIALS')
+        if credentials_json:
+            credentials_info = json.loads(credentials_json)
+            credentials = service_account.Credentials.from_service_account_info(credentials_info)
+        else:
+            credentials_path = 'credentials.json'
+            if os.path.exists(credentials_path):
+                credentials = service_account.Credentials.from_service_account_file(credentials_path)
+            else:
+                return vision.ImageAnnotatorClient()
+        return vision.ImageAnnotatorClient(credentials=credentials)
     except Exception as e:
         print(f"Error setting up Vision API client: {str(e)}")
         return None
@@ -135,8 +128,6 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
-# Run the server
-# Replace the last part with this:
 httpd = None
 
 def run_server():
