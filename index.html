@@ -47,24 +47,26 @@
                 ]
             }, (buttonId) => {
                 if (buttonId === 'camera' || buttonId === 'gallery') {
-                    tg.showPopup({
-                        title: 'Processing',
-                        message: 'Please wait while we process your image...',
-                        buttons: [
-                            {type: 'close', text: 'Cancel'}
-                        ]
-                    });
                     selectImage(buttonId === 'camera');
                 }
             });
         });
 
         function selectImage(useCamera) {
+            tg.showPopup({
+                title: 'Processing',
+                message: 'Please wait while we process your image...',
+                buttons: [
+                    {type: 'close', text: 'Cancel'}
+                ]
+            });
+
             const mediaOptions = useCamera ? { type: 'photo', removeAfterSend: true } : { types: ['photo'], removeAfterSend: true };
             tg.openMedia(mediaOptions, (media) => {
                 if (media && media.length > 0) {
                     uploadImage(media[0]);
                 } else {
+                    tg.closePopup();
                     tg.showAlert('No image selected.');
                 }
             });
@@ -74,11 +76,16 @@
             const formData = new FormData();
             formData.append('image', file);
 
-            fetch('https://127.0.0.1:5000/scan_receipt', {
+            fetch('https://your-server-url.com/scan_receipt', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 tg.closePopup();
                 document.getElementById('result').textContent = JSON.stringify(data, null, 2);

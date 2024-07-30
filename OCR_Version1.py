@@ -10,24 +10,27 @@ from PIL import Image
 from io import BytesIO
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 
-# Configure database connection
+# Update these connection details with your actual database information
+connection_string = (
+    'DRIVER={ODBC Driver 17 for SQL Server};'
+    'SERVER=your_server_name;'
+    'DATABASE=your_database_name;'
+    'UID=your_username;'
+    'PWD=your_password;'
+)
+
 try:
-    connection = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};'
-                                'SERVER=DESKTOP-34UAA17;'
-                                'DATABASE=Car Information;'
-                                'Trusted_Connection=yes;')
+    connection = pyodbc.connect(connection_string)
     cursor = connection.cursor()
     logging.info("Connection to SQL Server database established successfully.")
 except Exception as e:
     logging.error(f"Error connecting to SQL Server database: {e}")
 
-# Configure Gemini AI
-gemini_api_key = "AIzaSyDeXUlxp9OatBZVTXiPqa3rMC4w1Po3A6w"
+gemini_api_key = "your_gemini_api_key"
 genai.configure(api_key=gemini_api_key)
 model = genai.GenerativeModel(model_name="gemini-1.5-pro")
 
@@ -80,10 +83,8 @@ def process_extracted_text(extracted_text):
     cleaned_data_dict = {key.replace(":", "").strip(): (value.strip("$, ") if value is not None else None)
                          for key, value in data_dict.items()}
     
-    # Assign Driver Name (replace with actual logic to get username)
     cleaned_data_dict["Driver Name"] = "YourUsername"
 
-    # Convert date string to SQL Server date format
     if "DATE" in cleaned_data_dict and cleaned_data_dict["DATE"]:
         date_str = cleaned_data_dict["DATE"].replace(": ", "").strip()
         try:
@@ -92,7 +93,6 @@ def process_extracted_text(extracted_text):
             logging.error(f"Date conversion error. Original date: {date_str}")
             cleaned_data_dict["DATE"] = None
 
-    # Clean and convert numeric values
     for key in ["TOTAL", "AMOUNT", "QTY"]:
         if key in cleaned_data_dict and cleaned_data_dict[key]:
             cleaned_data_dict[key] = cleaned_data_dict[key].replace("$", "").replace(",", ".")
@@ -117,4 +117,4 @@ def insert_data_to_database(cleaned_data_dict):
     connection.commit()
 
 if __name__ == "__main__":
-    app.run(debug=True, ssl_context='adhoc')  # Use HTTPS for production
+    app.run(host='0.0.0.0', port=5000)
