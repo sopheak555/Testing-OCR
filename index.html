@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Scanner</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        button {
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            padding: 10px 20px;
+            margin: 10px 0;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #result {
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Receipt Scanner</h1>
+    <button id="scanButton">Scan Receipt</button>
+    <div id="result"></div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+
+        document.getElementById('scanButton').addEventListener('click', () => {
+            tg.showPopup({
+                title: 'Select Image',
+                message: 'Choose an image to scan',
+                buttons: [
+                    {id: 'camera', type: 'default', text: 'Take Photo'},
+                    {id: 'gallery', type: 'default', text: 'Choose from Gallery'}
+                ]
+            }, (buttonId) => {
+                if (buttonId === 'camera' || buttonId === 'gallery') {
+                    tg.showPopup({
+                        title: 'Processing',
+                        message: 'Please wait while we process your image...',
+                        buttons: [
+                            {type: 'close', text: 'Cancel'}
+                        ]
+                    });
+                    selectImage(buttonId === 'camera');
+                }
+            });
+        });
+
+        function selectImage(useCamera) {
+            const mediaOptions = useCamera ? { type: 'photo', removeAfterSend: true } : { types: ['photo'], removeAfterSend: true };
+            tg.openMedia(mediaOptions, (media) => {
+                if (media && media.length > 0) {
+                    uploadImage(media[0]);
+                } else {
+                    tg.showAlert('No image selected.');
+                }
+            });
+        }
+
+        function uploadImage(file) {
+            const formData = new FormData();
+            formData.append('image', file);
+
+            fetch('https://127.0.0.1:5000/scan_receipt', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                tg.closePopup();
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                tg.closePopup();
+                tg.showAlert('Error processing image: ' + error.message);
+            });
+        }
+
+        tg.ready();
+    </script>
+</body>
+</html>
