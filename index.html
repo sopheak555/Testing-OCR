@@ -24,86 +24,85 @@
 
     <script>
         let tg = window.Telegram.WebApp;
-        tg.expand();
+tg.expand();
 
-        function log(message) {
-            console.log(message);
-            document.getElementById('debug').textContent += message + '\n';
-        }
+function log(message) {
+    console.log(message);
+    document.getElementById('debug').textContent += message + '\n';
+}
 
-        document.getElementById('scanButton').addEventListener('click', () => {
-            log('Scan button clicked');
-            tg.showPopup({
-                title: 'Select Image',
-                message: 'Choose an image to scan',
-                buttons: [
-                    {id: 'camera', type: 'default', text: 'Take Photo'},
-                    {id: 'gallery', type: 'default', text: 'Choose from Gallery'}
-                ]
-            }, (buttonId) => {
-                log(`Button clicked: ${buttonId}`);
-                if (buttonId === 'camera' || buttonId === 'gallery') {
-                    selectImage(buttonId === 'camera');
-                }
-            });
+document.getElementById('scanButton').addEventListener('click', () => {
+    log('Scan button clicked');
+    selectImage();
+});
+
+function selectImage() {
+    log('Selecting image');
+    tg.showPopup({
+        title: 'Select Image',
+        message: 'Choose an image to scan',
+        buttons: [
+            {id: 'camera', type: 'default', text: 'Take Photo'},
+            {id: 'gallery', type: 'default', text: 'Choose from Gallery'}
+        ]
+    }, (buttonId) => {
+        log(`Button clicked: ${buttonId}`);
+        const useCamera = buttonId === 'camera';
+        const mediaOptions = useCamera ? { type: 'photo', removeAfterSend: true } : { types: ['photo'], removeAfterSend: true };
+        tg.openMedia(mediaOptions, (media) => {
+            if (media && media.length > 0) {
+                log('Media selected, uploading...');
+                uploadImage(media[0]);
+            } else {
+                log('No media selected');
+                tg.showAlert('No image selected.');
+            }
         });
+    });
+}
 
-        function selectImage(useCamera) {
-            log(`Selecting image, useCamera: ${useCamera}`);
-            tg.showPopup({
-                title: 'Processing',
-                message: 'Please wait while we process your image...',
-                buttons: [
-                    {type: 'close', text: 'Cancel'}
-                ]
-            });
+function uploadImage(file) {
+    log(`Uploading file: ${file.name}, size: ${file.size} bytes`);
+    
+    tg.showPopup({
+        title: 'Processing',
+        message: 'Please wait while we process your image...',
+        buttons: [
+            {type: 'close', text: 'Cancel'}
+        ]
+    });
 
-            const mediaOptions = useCamera ? { type: 'photo', removeAfterSend: true } : { types: ['photo'], removeAfterSend: true };
-            tg.openMedia(mediaOptions, (media) => {
-                if (media && media.length > 0) {
-                    log('Media selected, uploading...');
-                    uploadImage(media[0]);
-                } else {
-                    log('No media selected');
-                    tg.closePopup();
-                    tg.showAlert('No image selected.');
-                }
-            });
-        }
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('chat_id', tg.initDataUnsafe.user.id);
 
-        function uploadImage(file) {
-            log(`Uploading file: ${file.name}, size: ${file.size} bytes`);
-            const formData = new FormData();
-            formData.append('image', file);
-            formData.append('chat_id', tg.initDataUnsafe.user.id);
-
-            fetch('https://127.0.0.1:5000/scan_receipt', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                log(`Server response status: ${response.status}`);
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`Network response was not ok: ${response.status} ${response.statusText}\n${text}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                log('Data received from server');
-                tg.closePopup();
-                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
-                tg.showAlert('Receipt data has been processed.');
-            })
-            .catch(error => {
-                log(`Error: ${error.message}`);
-                tg.closePopup();
-                tg.showAlert('Error processing image: ' + error.message);
+    fetch('https://127.0.0.1:5000/scan_receipt', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        log(`Server response status: ${response.status}`);
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error(`Network response was not ok: ${response.status} ${response.statusText}\n${text}`);
             });
         }
+        return response.json();
+    })
+    .then(data => {
+        log('Data received from server');
+        tg.closePopup();
+        document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+        tg.showAlert('Receipt data has been processed.');
+    })
+    .catch(error => {
+        log(`Error: ${error.message}`);
+        tg.closePopup();
+        tg.showAlert('Error processing image: ' + error.message);
+    });
+}
 
-        tg.ready();
+tg.ready();
     </script>
 </body>
 </html>
