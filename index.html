@@ -73,10 +73,10 @@
         }
 
         function uploadImage(file) {
+            console.log("Uploading file:", file);
             const formData = new FormData();
             formData.append('image', file);
             formData.append('chat_id', tg.initDataUnsafe.user.id);
-
             fetch('https://127.0.0.1:5000/scan_receipt', {
                 method: 'POST',
                 body: formData

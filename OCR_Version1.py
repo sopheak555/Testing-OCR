@@ -23,14 +23,18 @@ gemini_api_key = "AIzaSyDeXUlxp9OatBZVTXiPqa3rMC4w1Po3A6w"
 genai.configure(api_key=gemini_api_key)
 model = genai.GenerativeModel(model_name="gemini-1.5-pro")
 
+
 @app.route('/scan_receipt', methods=['POST'])
 def scan_receipt():
+    logging.info("Received request to scan receipt")
     if 'image' not in request.files:
+        logging.error("No image file uploaded")
         return jsonify({"error": "No image file uploaded"}), 400
 
     image_file = request.files['image']
     chat_id = request.form.get('chat_id')
     
+    logging.info(f"Processing image for chat_id: {chat_id}")
     if not chat_id:
         return jsonify({"error": "No chat_id provided"}), 400
     
