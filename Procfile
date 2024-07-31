@@ -1,1 +1,1 @@
-web: gunicorn app:httpd
+web: python OCR_Version1.py

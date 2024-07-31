@@ -23,7 +23,7 @@ HTML = """
 </head>
 <body>
     <h1>Image Text Extractor</h1>
-    <button id="scanButton" onclick="captureImage()">Scan Image</button>
+    <button id="scanButton">Scan Image</button>
     <div id="loader">Processing...</div>
     <div id="result"></div>
 
@@ -31,14 +31,13 @@ HTML = """
         let tg = window.Telegram.WebApp;
         tg.expand();
 
-        function captureImage() {
+        document.getElementById('scanButton').addEventListener('click', function() {
             tg.showScanQrPopup({text: "Scan an image with text"}, function(result) {
                 if (result) {
-                    // The result contains the scanned image data
                     extractText(result);
                 }
             });
-        }
+        });
 
         async function extractText(imageData) {
             document.getElementById('loader').style.display = 'block';
@@ -68,25 +67,19 @@ HTML = """
 </html>
 """
 
-# Function to get Vision API client
 def get_vision_client():
     try:
         credentials_json = os.environ.get('GOOGLE_CREDENTIALS')
         if credentials_json:
             credentials_info = json.loads(credentials_json)
             credentials = service_account.Credentials.from_service_account_info(credentials_info)
+            return vision.ImageAnnotatorClient(credentials=credentials)
         else:
-            credentials_path = 'credentials.json'
-            if os.path.exists(credentials_path):
-                credentials = service_account.Credentials.from_service_account_file(credentials_path)
-            else:
-                return vision.ImageAnnotatorClient()
-        return vision.ImageAnnotatorClient(credentials=credentials)
+            return vision.ImageAnnotatorClient()
     except Exception as e:
         print(f"Error setting up Vision API client: {str(e)}")
         return None
 
-# Custom request handler
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
@@ -128,16 +121,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
-httpd = None
-
 def run_server():
-    global httpd
     PORT = int(os.environ.get('PORT', 8000))
-    httpd = socketserver.TCPServer(("", PORT), RequestHandler)
-    print(f"Serving at port {PORT}")
-    httpd.serve_forever()
+    with socketserver.TCPServer(("", PORT), RequestHandler) as httpd:
+        print(f"Serving at port {PORT}")
+        httpd.serve_forever()
 
 if __name__ == '__main__':
-    run_server()
-else:
     run_server()
