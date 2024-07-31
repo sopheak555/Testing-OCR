@@ -1,3 +1,5 @@
 Flask
 google-cloud-vision
 gunicorn
+google-generativeai
+Pillow

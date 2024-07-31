@@ -2,9 +2,10 @@ import http.server
 import socketserver
 import json
 import base64
-from google.cloud import vision
-from google.oauth2 import service_account
 import os
+import google.generativeai as genai
+from PIL import Image
+import io
 
 HTML = """
 <!DOCTYPE html>
@@ -19,11 +20,13 @@ HTML = """
         #result { margin-top: 20px; border: 1px solid #ccc; padding: 10px; min-height: 100px; }
         #loader { display: none; text-align: center; margin-top: 20px; }
         #scanButton { display: block; margin: 20px auto; padding: 10px 20px; font-size: 16px; }
+        #fileInput { display: none; }
     </style>
 </head>
 <body>
     <h1>Image Text Extractor</h1>
-    <button id="scanButton">Scan Image</button>
+    <button id="scanButton">Capture Image</button>
+    <input type="file" id="fileInput" accept="image/*" capture="environment">
     <div id="loader">Processing...</div>
     <div id="result"></div>
 
@@ -32,11 +35,18 @@ HTML = """
         tg.expand();
 
         document.getElementById('scanButton').addEventListener('click', function() {
-            tg.showScanQrPopup({text: "Scan an image with text"}, function(result) {
-                if (result) {
-                    extractText(result);
-                }
-            });
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    extractText(e.target.result.split(',')[1]);
+                };
+                reader.readAsDataURL(file);
+            }
         });
 
         async function extractText(imageData) {
@@ -67,17 +77,17 @@ HTML = """
 </html>
 """
 
-def get_vision_client():
+# Configure Gemini
+genai.configure(api_key=os.environ.get("GOOGLE_AI_STUDIO_API_KEY"))
+model = genai.GenerativeModel('gemini-pro-vision')
+
+def extract_text_with_gemini(image_data):
     try:
-        credentials_json = os.environ.get('GOOGLE_CREDENTIALS')
-        if credentials_json:
-            credentials_info = json.loads(credentials_json)
-            credentials = service_account.Credentials.from_service_account_info(credentials_info)
-            return vision.ImageAnnotatorClient(credentials=credentials)
-        else:
-            return vision.ImageAnnotatorClient()
+        image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+        response = model.generate_content(["Extract all the text from this image:", image])
+        return response.text
     except Exception as e:
-        print(f"Error setting up Vision API client: {str(e)}")
+        print(f"Error extracting text with Gemini: {str(e)}")
         return None
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -96,18 +106,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
             
-            client = get_vision_client()
-            if not client:
-                self.send_error(500, "Failed to initialize Vision API client")
-                return
-
             try:
-                image = vision.Image(content=base64.b64decode(data['image']))
-                response = client.text_detection(image=image)
-                texts = response.text_annotations
-
-                if texts:
-                    extracted_text = texts[0].description
+                extracted_text = extract_text_with_gemini(data['image'])
+                if extracted_text:
                     result = {'text': extracted_text}
                 else:
                     result = {'text': 'No text found in the image'}
