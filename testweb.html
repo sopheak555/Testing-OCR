@@ -77,14 +77,14 @@
 
         document.getElementById('scanButton').addEventListener('click', function() {
             tg.expand();
-            tg.showScanQrPopup({
-                text: "Please scan an image"
+            tg.openMediaCapture({
+                type: 'photo'
             }, function(result) {
-                if (result) {
-                    scannedImage = result;
-                    document.getElementById('previewImage').src = result;
+                if (result && result[0]) {
+                    scannedImage = result[0].src;
+                    document.getElementById('previewImage').src = scannedImage;
                     document.getElementById('previewImage').style.display = 'block';
-                    processImage(result);
+                    processImage(scannedImage);
                 }
             });
         });
@@ -108,7 +108,6 @@
                 document.getElementById('loadingIndicator').style.display = 'block';
                 document.getElementById('extractedText').innerText = '';
 
-                console.log('Sending image data to server...');
                 const response = await fetch('http://localhost:8080/process_image', {
                     method: 'POST',
                     headers: {
@@ -117,22 +116,20 @@
                     body: JSON.stringify({ image_data: imageData }),
                 });
 
-                console.log('Server response status:', response.status);
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error(`Server response was not ok. Status: ${response.status}, Error: ${errorText}`);
                 }
 
                 const result = await response.json();
-                console.log('Received data from server:', result);
                 displayExtractedData(result.extracted_data);
             } catch (error) {
-                console.error('Error processing image:', error);
                 document.getElementById('extractedText').innerText = `Error processing image: ${error.message}. Please try again.`;
             } finally {
                 document.getElementById('loadingIndicator').style.display = 'none';
             }
         }
+
         function displayExtractedData(data) {
             let formattedText = 'Extracted Data:\n\n';
             for (const [key, value] of Object.entries(data)) {
