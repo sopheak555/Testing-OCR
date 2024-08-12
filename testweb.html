@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Mini App - Image Scanner</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button, .file-input-label {
+            background-color: #0088cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+        #previewImage {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        #extractedText {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f2f5;
+            border-radius: 4px;
+        }
+        #loadingIndicator {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        #fileInput {
+            display: none;
+        }
+        .test-mode {
+            background-color: #ffeb3b;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Scanner</h1>
+        <div class="test-mode">
+            <h3>Test Mode</h3>
+            <label for="fileInput" class="file-input-label">Upload Image for Testing</label>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+        <button id="scanButton">Scan Image (Telegram)</button>
+        <img id="previewImage" src="" alt="Scanned Image Preview" style="display: none;">
+        <div id="loadingIndicator">Processing image...</div>
+        <div id="extractedText"></div>
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        let scannedImage = null;
+
+        document.getElementById('scanButton').addEventListener('click', function() {
+            tg.expand();
+            tg.showScanQrPopup({
+                text: "Please scan an image"
+            }, function(result) {
+                if (result) {
+                    scannedImage = result;
+                    document.getElementById('previewImage').src = result;
+                    document.getElementById('previewImage').style.display = 'block';
+                    processImage(result);
+                }
+            });
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    scannedImage = e.target.result;
+                    document.getElementById('previewImage').src = scannedImage;
+                    document.getElementById('previewImage').style.display = 'block';
+                    processImage(scannedImage);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        async function processImage(imageData) {
+            try {
+                document.getElementById('loadingIndicator').style.display = 'block';
+                document.getElementById('extractedText').innerText = '';
+
+                console.log('Sending image data to server...');
+                const response = await fetch('http://localhost:8080/process_image', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image_data: imageData }),
+                });
+
+                console.log('Server response status:', response.status);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server response was not ok. Status: ${response.status}, Error: ${errorText}`);
+                }
+
+                const result = await response.json();
+                console.log('Received data from server:', result);
+                displayExtractedData(result.extracted_data);
+            } catch (error) {
+                console.error('Error processing image:', error);
+                document.getElementById('extractedText').innerText = `Error processing image: ${error.message}. Please try again.`;
+            } finally {
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+        function displayExtractedData(data) {
+            let formattedText = 'Extracted Data:\n\n';
+            for (const [key, value] of Object.entries(data)) {
+                formattedText += `${key}: ${value}\n`;
+            }
+            document.getElementById('extractedText').innerText = formattedText;
+        }
+
+        tg.ready();
+    </script>
+</body>
+</html>
