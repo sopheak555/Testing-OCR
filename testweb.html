@@ -62,10 +62,9 @@
         <h1>Image Scanner</h1>
         <div class="test-mode">
             <h3>Test Mode</h3>
-            <label for="fileInput" class="file-input-label">Upload Image for Testing</label>
-            <input type="file" id="fileInput" accept="image/*">
+            <label for="fileInput" class="file-input-label">Upload or Capture Image</label>
+            <input type="file" id="fileInput" accept="image/*" capture="camera">
         </div>
-        <button id="scanButton">Scan Image (Telegram)</button>
         <img id="previewImage" src="" alt="Scanned Image Preview" style="display: none;">
         <div id="loadingIndicator">Processing image...</div>
         <div id="extractedText"></div>
@@ -74,20 +73,6 @@
     <script>
         let tg = window.Telegram.WebApp;
         let scannedImage = null;
-
-        document.getElementById('scanButton').addEventListener('click', function() {
-            tg.expand();
-            tg.openMediaCapture({
-                type: 'photo'
-            }, function(result) {
-                if (result && result[0]) {
-                    scannedImage = result[0].src;
-                    document.getElementById('previewImage').src = scannedImage;
-                    document.getElementById('previewImage').style.display = 'block';
-                    processImage(scannedImage);
-                }
-            });
-        });
 
         document.getElementById('fileInput').addEventListener('change', function(event) {
             const file = event.target.files[0];
