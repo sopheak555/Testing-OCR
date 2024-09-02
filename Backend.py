@@ -19,7 +19,7 @@ import platform
 import re
 
 # Set your Gemini API key
-gemini_api_key = "AIzaSyDeXUlxp9OatBZVTXiPqa3rMC4w1Po3A6w"
+gemini_api_key = ""
 
 # Configure the Google Generative AI
 genai.configure(api_key=gemini_api_key)
@@ -30,9 +30,9 @@ telegram_bot_token = "6418111603:AAG2Sep82eQwD2V8oFKGDtMPq85rjGZpLCs"
 
 
 # Database connection (replace with your actual connection details)
-connection = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};'
-                            'SERVER=DESKTOP-34UAA17;'
-                            'DATABASE=Car Information;'
+connection = pyodbc.connect('DRIVER={"--"};'
+                            'SERVER=;'
+                            'DATABASE=;'
                             'Trusted_Connection=yes;')
 cursor = connection.cursor()
 
